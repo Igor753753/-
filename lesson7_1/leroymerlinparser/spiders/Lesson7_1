@@ -1,0 +1,43 @@
+import scrapy
+from scrapy.http import HtmlResponse
+from leroymerlinparser.items import LeroymerlinparserItem
+from scrapy.loader import ItemLoader
+
+
+
+
+
+class LeroymerlinruSpider(scrapy.Spider):
+    name = 'leroymerlinru'
+    allowed_domains = ['leroymerlin.ru']
+
+    start_urls = ['http://leroymerlin.ru/']
+
+
+
+def parse(self, response: HtmlResponse):
+    links_on_tile = response.xpath("//div[@class='hover-image-buttons']/a/@href").extract()
+    for link in links_on_tile:
+        if 'title' in link:
+            yield response.follow(link, callback=parse_title)
+
+    next_page = response.xpath("//div[@class='next-paginator-button-wrapper']/a/@href").extract_first()
+    yield response.follow(next_page, callback=self.parse)
+def parse_tile(response: HtmlResponse):
+    
+    # Нужно создать экземпляр ItemLoader, обратите внимание, что первым параметром должен быть экземпляр объекта ...
+    loader = ItemLoader(item=LeroymerlinparserItem(), response=response)
+    # Назначить непосредственно на поле, особенно нужно обратить внимание, независимо от того, что назначенные данные, они будут автоматически
+    # преобразованы в тип списка
+
+    loader.add_value('_id', str(response))
+    # Вызовите селектор xpath для извлечения информации
+    loader.add_xpath('name', "//h1/text()")
+
+    loader.add_xpath('photos', "//source[@media=' only screen and (min-width: 1024px)']/@srcset")
+    loader.add_xpath('terms', "//dt/text()")
+    loader.add_xpath('definitions', "//dd/text()")
+    loader.add_xpath('price', "//meta[@itemprop='price']/@content")
+    loader.add_value('url', response.url)
+
+    yield loader.load_item()
